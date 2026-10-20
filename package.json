@@ -1,0 +1,7 @@
+{
+  "name": "plaeta",
+  "version": "4.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Plaeta: a study app for final-year students. Marking, a mistake loop and a daily plan, one planet per subject."
+}

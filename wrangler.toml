@@ -1,0 +1,27 @@
+# Cloudflare Worker: src/worker.js answers /api/<name>; every other path is a file from the built dist/ folder
+# (npm run build:deploy makes it). Keys go in the Cloudflare dashboard as Secrets, never in this file. Plain settings
+# go under [vars] below, because Cloudflare takes them from this file.
+# The name below must match the Worker's name in the Cloudflare dashboard exactly.
+name = "plaeta-site"
+main = "src/worker.js"
+compatibility_date = "2026-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+# /api/* always reaches the Worker; a path with no file gets the site's 404 page
+run_worker_first = ["/api/*"]
+not_found_handling = "404-page"
+
+# The paper expiry job (60 days after upload) runs once a day at 16:00 UTC (2am or 3am in Sydney)
+[triggers]
+crons = ["0 16 * * *"]
+
+[observability]
+enabled = true
+
+[vars]
+# Which AI the app uses: "gemini" (free trial, key in the Secret GEMINI_API_KEY) or "anthropic" (Claude, key in the
+# Secret ANTHROPIC_API_KEY). To switch, change the word between the quote marks and commit.
+AI_PROVIDER = "gemini"
