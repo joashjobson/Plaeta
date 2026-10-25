@@ -80,7 +80,7 @@ var models_default = {
 // config/app.json
 var app_default = {
   _about: "App-wide switches. Change these, not the code.",
-  version: "4.0.0-trial",
+  version: "7.0.0-trial",
   accounts: { enabled: false },
   paperTestButton: "localhost-only",
   simulatedProvider: "localhost-only",
@@ -183,83 +183,6 @@ function createSupabase({ url, serviceKey, fetch: f = globalThis.fetch } = {}) {
   };
 }
 
-// server/lib/stripe-client.js
-var StripeError = class extends Error {
-  constructor(message, status) {
-    super(message);
-    this.status = status;
-  }
-};
-var enc = new TextEncoder();
-var hex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
-async function hmacHex(secret, text) {
-  const key = await crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  return hex(await crypto.subtle.sign("HMAC", key, enc.encode(text)));
-}
-function sameText(a, b) {
-  if (a.length !== b.length) return false;
-  let d = 0;
-  for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return d === 0;
-}
-async function verifyWebhook(rawBody, header, secret, { now = Date.now(), toleranceSec = 300 } = {}) {
-  if (!secret) throw new StripeError("STRIPE_WEBHOOK_SECRET is not set", 500);
-  if (!header) throw new StripeError("Missing Stripe-Signature header", 400);
-  const parts = String(header).split(",").map((s) => s.trim().split("="));
-  const t = (parts.find((p) => p[0] === "t") || [])[1];
-  const sigs = parts.filter((p) => p[0] === "v1").map((p) => p[1] || "");
-  if (!t || !/^\d+$/.test(t) || !sigs.length) throw new StripeError("Bad Stripe-Signature header", 400);
-  if (Math.abs(now / 1e3 - Number(t)) > toleranceSec) throw new StripeError("Webhook timestamp is too old", 400);
-  const expected = await hmacHex(secret, `${t}.${rawBody}`);
-  if (!sigs.some((s) => sameText(s, expected))) throw new StripeError("Webhook signature does not match", 400);
-  try {
-    return JSON.parse(rawBody);
-  } catch (e) {
-    throw new StripeError("Webhook body is not JSON", 400);
-  }
-}
-function formEncode(obj, prefix = "", out = new URLSearchParams()) {
-  for (const [k, v] of Object.entries(obj)) {
-    if (v === void 0 || v === null) continue;
-    const key = prefix ? `${prefix}[${k}]` : k;
-    if (typeof v === "object") formEncode(v, key, out);
-    else out.append(key, String(v));
-  }
-  return out;
-}
-function createStripe({ secretKey, fetch: f = globalThis.fetch } = {}) {
-  if (!secretKey) throw new StripeError("Stripe is not set up (STRIPE_SECRET_KEY).", 503);
-  async function call(method, path, params) {
-    const res = await f("https://api.stripe.com/v1" + path, {
-      method,
-      headers: { authorization: `Bearer ${secretKey}`, "content-type": "application/x-www-form-urlencoded" },
-      body: params ? formEncode(params).toString() : void 0
-    });
-    const data = await res.json().catch(() => null);
-    if (!res.ok) throw new StripeError(data && data.error && data.error.message || `Stripe request failed (${res.status})`, res.status);
-    return data;
-  }
-  return {
-    getSubscription: (id) => call("GET", `/subscriptions/${encodeURIComponent(id)}`),
-    createCheckoutSession: ({ price, owner, successUrl, cancelUrl, planId }) => call("POST", "/checkout/sessions", {
-      mode: "subscription",
-      line_items: [{ price, quantity: 1 }],
-      client_reference_id: owner,
-      success_url: successUrl,
-      cancel_url: cancelUrl,
-      metadata: { owner, plan: planId },
-      subscription_data: { metadata: { owner, plan: planId } }
-    }),
-    // pause: payments stop until resumesAt (seconds); the subscription and the student's data stay
-    pauseSubscription: (id, resumesAt) => call("POST", `/subscriptions/${encodeURIComponent(id)}`, { pause_collection: { behavior: "void", resumes_at: resumesAt } }),
-    resumeSubscription: (id) => call("POST", `/subscriptions/${encodeURIComponent(id)}`, { pause_collection: "" }),
-    // cancel at the end of the period already paid for (one step; no more payments)
-    cancelSubscription: (id) => call("POST", `/subscriptions/${encodeURIComponent(id)}`, { cancel_at_period_end: true }),
-    // straight away, used when the account is deleted
-    cancelNow: (id) => call("DELETE", `/subscriptions/${encodeURIComponent(id)}`)
-  };
-}
-
 // server/lib/accounts.js
 var HttpError = class extends Error {
   constructor(status, message, extra) {
@@ -281,9 +204,6 @@ function resolveDeps(deps = {}) {
   const out = Object.assign({ env, now: () => Date.now() }, deps);
   if (!out.db) Object.defineProperty(out, "db", { get() {
     return this._db ||= createSupabase({ url: env.SUPABASE_URL, serviceKey: env.SUPABASE_SERVICE_ROLE_KEY });
-  } });
-  if (!out.stripe) Object.defineProperty(out, "stripe", { get() {
-    return this._stripe ||= createStripe({ secretKey: env.STRIPE_SECRET_KEY });
   } });
   return out;
 }
@@ -328,43 +248,20 @@ function endpoint(fn, { methods = ["POST"], alwaysOn = false } = {}) {
   };
 }
 var iso = (ms) => new Date(ms).toISOString();
-var fromUnix = (s) => s ? new Date(s * 1e3).toISOString() : null;
-
-// config/plans.json
-var plans_default = {
-  _about: "Plans, prices and allowances. Prices are AUD per month. Nothing in the code hardcodes a price or a number of papers. The ids (basic, standard, full) stay the same; only the names show.",
-  currency: "AUD",
-  trialPlan: "standard",
-  plans: [
-    { id: "basic", name: "Moon", priceMonthly: 12, papersPerMonth: 10, fairUse: { essayMarksPerMonth: 40, uploadChecksPerMonth: 60 }, examBoost: false, popular: false, stripePriceId: null },
-    { id: "standard", name: "Planet", priceMonthly: 22, papersPerMonth: 20, fairUse: { essayMarksPerMonth: 80, uploadChecksPerMonth: 120 }, examBoost: true, popular: true, stripePriceId: null },
-    { id: "full", name: "Nebula", priceMonthly: 33, papersPerMonth: 30, fairUse: { essayMarksPerMonth: 150, uploadChecksPerMonth: 180 }, examBoost: true, popular: false, stripePriceId: null }
-  ],
-  fairUse: {
-    _about: "Varda is included in every plan. The stronger model's jobs have a monthly fair-use limit per plan (fairUse in each plan above): essay marking (GRADE_ESSAY) and the extra check on paper questions that look misread (CHECK_ITEMS). The student is warned at warnAt and stopped at the limit; a paper whose checks are used up still uploads, and its unsure questions wait for the student to check them. The quick model's jobs (tutor, flashcards, plans, notes) have no monthly limit, only the abuse ceiling server.perUserDailyTokenCeiling in limits.json. Placeholder numbers until Archer sets them.",
-    warnAt: 0.8,
-    tasks: { GRADE_ESSAY: "essayMarksPerMonth", CHECK_ITEMS: "uploadChecksPerMonth" }
-  },
-  examBoost: { multiplier: 2, daysBeforeExam: 14 },
-  pause: { maxMonths: 2, keepData: true },
-  cancel: { steps: 1, offerExportFirst: true },
-  refund: { paperOnOurError: true },
-  launchEstimates: {
-    _about: "Worked out on 16 Oct 2026 at the prices in models.json. The real-paper test on Anthropic should replace these with logged numbers.",
-    audPerUsd: 1.4434,
-    usdPerAud: 0.6928,
-    aiCostPerPaperAud: { mathsScience: 0.29, essay: 0.33 },
-    otherAiPerStudentMonthAud: 0.3,
-    stripe: { percent: 1.65, fixedAud: 0.3, billingPercent: 0.7 },
-    supabaseProMonthlyAud: 36,
-    targetMargin: 0.6
-  }
-};
 
 // config/limits.json
 var limits_default = {
   _about: "Limits the app enforces. Change these, not the code.",
   paperExpiryDays: 60,
+  monthly: {
+    _about: "Monthly limits for each student, a budget cap so one student cannot run up the AI bill. Plaeta is free: there are no plans or prices. Papers count when uploaded; a paper the app fails to read is given back. Essay marking (GRADE_ESSAY) and the extra check on paper questions that look misread (CHECK_ITEMS) use the stronger model, so they have a monthly limit too: the student is warned at warnAt and stopped at the limit (a paper whose checks are used up still uploads, and its unsure questions wait for the student to check them). The quick model's jobs (tutor, flashcards, plans, notes) have no monthly limit, only the abuse ceiling server.perUserDailyTokenCeiling below. The exam boost multiplies the paper limit in the days before an exam the student entered. Keep supabase/migrations monthly_limits() the same as these numbers.",
+    papersPerMonth: 20,
+    essayMarksPerMonth: 80,
+    uploadChecksPerMonth: 120,
+    warnAt: 0.8,
+    tasks: { GRADE_ESSAY: "essayMarksPerMonth", CHECK_ITEMS: "uploadChecksPerMonth" },
+    examBoost: { on: true, multiplier: 2, daysBeforeExam: 14 }
+  },
   upload: {
     acceptedTypes: ["application/pdf", "image/png", "image/jpeg", "image/webp"],
     maxFileMB: 60,
@@ -395,7 +292,13 @@ var limits_default = {
     aiTailorPerDay: 1
   },
   review: { leitnerDays: [1, 3, 7, 14, 30] },
-  cards: { frontMaxWords: 10, backMaxWords: 25, quoteMaxWords: 30 },
+  cards: {
+    frontMaxWords: 10,
+    backMaxWords: 25,
+    quoteMaxWords: 30,
+    _about: "Word limits apply to cards the app makes (from a lost mark, a list or an AI suggestion). Cards a student writes in their own decks have no limit, as in Anki. deckDefaults are the starting options of a new deck (the student can change them per deck): steps in minutes, intervals in days.",
+    deckDefaults: { newPerDay: 20, reviewsPerDay: 200, steps: [1, 10], relearnSteps: [10], graduatingIvl: 1, easyIvl: 4, startEase: 2.5, easyBonus: 1.3, hardFactor: 1.2, maxIvl: 36500, newOrder: "added", learnAheadMin: 20 }
+  },
   server: {
     perUserRequestsPerMinute: 30,
     perUserDailyTokenCeiling: 2e6,
@@ -404,7 +307,7 @@ var limits_default = {
 };
 
 // app/core/config.js
-var CONFIG = { app: app_default, plans: plans_default, limits: limits_default, models: models_default };
+var CONFIG = { app: app_default, limits: limits_default, models: models_default };
 
 // app/core/util.js
 var wordCount = (s) => (String(s || "").trim().match(/\S+/g) || []).length;
@@ -419,6 +322,7 @@ var KINDS = [
   "attempt",
   "session",
   "logbook",
+  "deck",
   "card",
   "srs",
   "plan",
@@ -463,21 +367,6 @@ function checkSignupAge(dob, provider2, now = /* @__PURE__ */ new Date()) {
   if (age < minimum) return { ok: false, age, minimum, reason: "too-young" };
   return { ok: true, age, minimum };
 }
-var findPlan = (id) => CONFIG.plans.plans.find((p) => p.id === id) || null;
-function planForPrice(priceId, env = {}) {
-  if (!priceId) return null;
-  return CONFIG.plans.plans.find((p) => p.stripePriceId === priceId || env["STRIPE_PRICE_" + p.id.toUpperCase()] === priceId) || null;
-}
-var priceIdFor = (plan, env = {}) => plan && (plan.stripePriceId || env["STRIPE_PRICE_" + plan.id.toUpperCase()]) || null;
-function pauseUntil(months, now = Date.now()) {
-  const max = CONFIG.plans.pause.maxMonths;
-  const n2 = Number(months);
-  if (!Number.isInteger(n2) || n2 < 1) return { ok: false, reason: "Choose how many months to pause for." };
-  if (n2 > max) return { ok: false, reason: `You can pause for up to ${max} months.` };
-  const d = new Date(now);
-  d.setMonth(d.getMonth() + n2);
-  return { ok: true, until: d.getTime(), months: n2 };
-}
 
 // server/functions/account.js
 var OWNED_TABLES = [
@@ -489,6 +378,7 @@ var OWNED_TABLES = [
   "attempts",
   "sessions",
   "logbook_rules",
+  "decks",
   "cards",
   "srs",
   "plans",
@@ -502,16 +392,11 @@ var OWNED_TABLES = [
   "cost_log",
   "upload_log",
   "reports",
-  "moderation_log",
-  "subscriptions"
+  "moderation_log"
 ];
 var BUCKETS = ["papers", "syllabuses"];
 var EMAIL = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/;
 var provider = (env) => env.AI_PROVIDER || models_default.defaultProvider;
-async function subscriptionOf(db, owner) {
-  const [s] = await db.select("subscriptions", { owner }, { limit: 1 });
-  return s || null;
-}
 var actions = {
   async signup(body, d) {
     const email = String(body.email || "").trim().toLowerCase();
@@ -531,7 +416,7 @@ var actions = {
       throw e;
     }
     const id = user.id || user.user && user.user.id;
-    await d.db.insert("profiles", { owner: id, dob: body.dob, referral_code: null, plan: null, plan_status: null, plan_paused_until: null, spelling: "en-AU" });
+    await d.db.insert("profiles", { owner: id, dob: body.dob, referral_code: null, spelling: "en-AU" });
     return { ok: true, userId: id };
   },
   async signin(body, d) {
@@ -542,39 +427,6 @@ var actions = {
       throw new HttpError(401, "That email and password do not match.");
     }
   },
-  async checkout(body, d, user) {
-    const plan = findPlan(body.plan);
-    if (!plan) throw new HttpError(400, "That plan does not exist.");
-    const price = priceIdFor(plan, d.env);
-    if (!price) throw new HttpError(501, "Payments for this plan are not set up yet.");
-    const site = (d.env.SITE_URL || "").replace(/\/+$/, "");
-    if (!site) throw new HttpError(501, "Payments are not set up yet.");
-    const s = await d.stripe.createCheckoutSession({ price, owner: user.id, planId: plan.id, successUrl: `${site}/app/#/settings`, cancelUrl: `${site}/app/#/plans` });
-    return { url: s.url };
-  },
-  async pause(body, d, user) {
-    const r = pauseUntil(body.months, d.now());
-    if (!r.ok) throw new HttpError(400, r.reason);
-    const sub = await subscriptionOf(d.db, user.id);
-    if (sub && sub.stripe_subscription_id) await d.stripe.pauseSubscription(sub.stripe_subscription_id, Math.floor(r.until / 1e3));
-    await d.db.update("profiles", { owner: user.id }, { plan_paused_until: iso(r.until) });
-    if (sub) await d.db.update("subscriptions", { owner: user.id }, { paused_until: iso(r.until) });
-    return { ok: true, pausedUntil: iso(r.until), dataKept: true };
-  },
-  async resume(body, d, user) {
-    const sub = await subscriptionOf(d.db, user.id);
-    if (sub && sub.stripe_subscription_id) await d.stripe.resumeSubscription(sub.stripe_subscription_id);
-    await d.db.update("profiles", { owner: user.id }, { plan_paused_until: null });
-    if (sub) await d.db.update("subscriptions", { owner: user.id }, { paused_until: null });
-    return { ok: true };
-  },
-  async cancel(body, d, user) {
-    const sub = await subscriptionOf(d.db, user.id);
-    if (sub && sub.stripe_subscription_id) await d.stripe.cancelSubscription(sub.stripe_subscription_id);
-    await d.db.update("profiles", { owner: user.id }, { cancelled_at: iso(d.now()) });
-    if (sub) await d.db.update("subscriptions", { owner: user.id }, { cancel_at_period_end: true });
-    return { ok: true, endsAt: sub ? sub.current_period_end : null, dataKept: true };
-  },
   async export(body, d, user) {
     const records = {};
     for (const t of OWNED_TABLES) records[t] = await d.db.select(t, { owner: user.id });
@@ -582,8 +434,6 @@ var actions = {
   },
   async delete(body, d, user) {
     if (body.confirm !== "DELETE") throw new HttpError(400, "Type DELETE to confirm.");
-    const sub = await subscriptionOf(d.db, user.id);
-    if (sub && sub.stripe_subscription_id && sub.status !== "canceled") await d.stripe.cancelNow(sub.stripe_subscription_id);
     for (const b of BUCKETS) {
       const paths = await d.db.storage.list(b, user.id);
       if (paths.length) await d.db.storage.remove(b, paths);
@@ -2053,110 +1903,11 @@ async function handler2(req, ctx = {}) {
   }
 }
 
-// server/functions/billing-webhook.js
-var ACTIVE = ["active", "trialing", "past_due"];
-async function ownerFor(db, { owner, subscriptionId, customerId }) {
-  if (owner) return owner;
-  if (subscriptionId) {
-    const [r] = await db.select("subscriptions", { stripe_subscription_id: subscriptionId }, { limit: 1 });
-    if (r) return r.owner;
-  }
-  if (customerId) {
-    const [r] = await db.select("subscriptions", { stripe_customer_id: customerId }, { limit: 1 });
-    if (r) return r.owner;
-  }
-  return null;
-}
-async function startUsagePeriod(db, owner, start, end) {
-  if (!owner || !start) return null;
-  const [row] = await db.insert(
-    "usage",
-    { owner, period_start: start, period_end: end, papers: 0, refunds: 0, requests_deep: 0, requests_quick: 0, in_tok: 0, out_tok: 0, cost_aud: 0 },
-    { upsert: true, onConflict: "owner,period_start", ignoreDuplicates: true }
-  );
-  return row || null;
-}
-async function applySubscription(d, sub, ownerHint) {
-  const { db, env } = d;
-  const owner = sub.metadata && sub.metadata.owner || ownerHint || await ownerFor(db, { subscriptionId: sub.id, customerId: sub.customer });
-  if (!owner) return { ignored: "no student for this subscription" };
-  const item2 = sub.items && sub.items.data && sub.items.data[0] || {};
-  const plan = planForPrice(item2.price && item2.price.id, env);
-  if (!plan) console.warn("[billing] subscription price is not in config/plans.json:", item2.price && item2.price.id);
-  const live = ACTIVE.includes(sub.status) && !!plan;
-  const start = fromUnix(sub.current_period_start ?? item2.current_period_start);
-  const end = fromUnix(sub.current_period_end ?? item2.current_period_end);
-  const pausedUntil = sub.pause_collection && sub.pause_collection.resumes_at ? fromUnix(sub.pause_collection.resumes_at) : null;
-  const boost = plans_default.examBoost;
-  await db.insert("subscriptions", {
-    owner,
-    stripe_customer_id: sub.customer || null,
-    stripe_subscription_id: sub.id,
-    status: sub.status,
-    plan: plan ? plan.id : null,
-    papers_per_month: plan ? plan.papersPerMonth : 0,
-    exam_boost: !!(plan && plan.examBoost),
-    boost_multiplier: boost.multiplier,
-    boost_days: boost.daysBeforeExam,
-    current_period_start: start,
-    current_period_end: end,
-    cancel_at_period_end: !!sub.cancel_at_period_end,
-    paused_until: pausedUntil,
-    updated: new Date(d.now()).toISOString()
-  }, { upsert: true, onConflict: "owner" });
-  await db.update("profiles", { owner }, { plan: live ? plan.id : null, plan_status: sub.status, plan_paused_until: pausedUntil });
-  if (live && start) await startUsagePeriod(db, owner, start, end);
-  return { owner, plan: live ? plan.id : null, status: sub.status };
-}
-async function handleEvent(d, event) {
-  const o = event.data && event.data.object || {};
-  switch (event.type) {
-    case "checkout.session.completed": {
-      if (o.mode !== "subscription" || !o.subscription) return { ignored: "not a subscription" };
-      const owner = o.client_reference_id || o.metadata && o.metadata.owner;
-      const sub = typeof o.subscription === "object" ? o.subscription : await d.stripe.getSubscription(o.subscription);
-      return applySubscription(d, sub, owner);
-    }
-    case "customer.subscription.created":
-    case "customer.subscription.updated":
-      return applySubscription(d, o);
-    case "customer.subscription.deleted":
-      return applySubscription(d, Object.assign({}, o, { status: "canceled" }));
-    case "invoice.paid": {
-      const subId = typeof o.subscription === "string" ? o.subscription : o.parent && o.parent.subscription_details && o.parent.subscription_details.subscription || null;
-      const meta = o.subscription_details && o.subscription_details.metadata || o.parent && o.parent.subscription_details && o.parent.subscription_details.metadata || {};
-      const owner = await ownerFor(d.db, { owner: meta.owner, subscriptionId: subId, customerId: o.customer });
-      if (!owner) return { ignored: "no student for this invoice" };
-      const line = o.lines && o.lines.data && o.lines.data[0] || {};
-      const period = line.period || { start: o.period_start, end: o.period_end };
-      const start = fromUnix(period.start), end = fromUnix(period.end);
-      await d.db.update("subscriptions", { owner }, { current_period_start: start, current_period_end: end, updated: new Date(d.now()).toISOString() });
-      await startUsagePeriod(d.db, owner, start, end);
-      return { owner, period: start };
-    }
-    default:
-      return { ignored: event.type };
-  }
-}
-var makeHandler2 = endpoint(async (request, d) => {
-  const raw = await request.text();
-  let event;
-  try {
-    event = await verifyWebhook(raw, request.headers.get("stripe-signature"), d.env.STRIPE_WEBHOOK_SECRET, { now: d.now() });
-  } catch (e) {
-    if (e instanceof StripeError) throw new HttpError(e.status === 500 ? 500 : 400, e.status === 500 ? "Webhook is not set up." : "Invalid signature.");
-    throw e;
-  }
-  const result2 = await handleEvent(d, event);
-  return json(200, { received: true, type: event.type, result: result2 });
-});
-var billing_webhook_default = makeHandler2();
-
 // server/functions/report.js
 var KINDS2 = ["problem", "unsafe", "wrong-mark"];
 var MAX = 2e3;
 var clip = (v, n2) => v == null ? null : String(v).slice(0, n2);
-var makeHandler3 = endpoint(async (request, d) => {
+var makeHandler2 = endpoint(async (request, d) => {
   const user = await requireUser(request, d.db);
   rateLimit(`report:${user.id}`, 5, d.now());
   const body = await readJSON(request, 16384);
@@ -2178,7 +1929,7 @@ var makeHandler3 = endpoint(async (request, d) => {
   });
   return json(200, { ok: true, id: row && row.id, safety: urgent ? SAFETY_MESSAGE : null });
 });
-var report_default = makeHandler3();
+var report_default = makeHandler2();
 
 // server/functions/gemini.js
 var GOOGLE = "https://generativelanguage.googleapis.com/v1beta";
@@ -2362,13 +2113,13 @@ async function expirePapers(db, now = Date.now()) {
   }
   return out;
 }
-var makeHandler4 = endpoint(async (request, d) => {
+var makeHandler3 = endpoint(async (request, d) => {
   rateLimit("expire-papers", 4, d.now());
   const result2 = await expirePapers(d.db, d.now());
   console.log("[expire-papers]", JSON.stringify(result2));
   return json(200, { ok: true, result: result2 });
 }, { methods: ["POST", "GET"] });
-var expire_papers_default = makeHandler4();
+var expire_papers_default = makeHandler3();
 function sampleData(now = Date.now()) {
   const DAY = 864e5, owner = "student-1";
   const old = iso(now - (limits_default.paperExpiryDays + 1) * DAY), fresh = iso(now - 5 * DAY);
@@ -2415,7 +2166,7 @@ if (typeof process !== "undefined" && process.argv[1] && import.meta.url === pat
 }
 
 // src/worker.js
-var API = { account: account_default, "ai-config": handler, "ai-proxy": handler2, "billing-webhook": billing_webhook_default, report: report_default };
+var API = { account: account_default, "ai-config": handler, "ai-proxy": handler2, report: report_default };
 function useEnv(env) {
   const pe = globalThis.process && globalThis.process.env;
   if (pe) {
