@@ -24,7 +24,6 @@
       <a href="index.html#how">How it works</a>
       <a href="index.html#subjects">Subjects</a>
       <a href="index.html#privacy">Privacy</a>
-      <a href="index.html#pricing">Pricing</a>
       <a href="index.html#faq">FAQ</a>
       <a href="/app/" data-app>Open the app</a>
     </nav>
@@ -67,36 +66,35 @@
     <h2 id="test">The free test phase</h2>
     <p>Before launch, Plaeta runs as a free test version. In this phase:</p>
     <ul>
-      <li>There are no accounts and no payments. Your subjects, notes and progress are saved in your own web browser on your own device. We do not receive them.</li>
+      <li>There are no accounts. Your subjects, notes and progress are saved in your own web browser on your own device. We do not receive them.</li>
       <li>AI features use Google Gemini's free tier. By default, your requests pass through our server, which adds our shared trial key and sends them on to Google. We do not keep what you send. If you add your own Gemini key in the app's Settings instead, it is stored only in your browser, is never included in backups, and your requests go straight from your browser to Google.</li>
       <li>Either way, what you send to the AI is handled by Google under its own terms. Google's terms for its free tier allow it to use that content to improve its products, so do not upload anything personal.</li>
       <li>Because of Google's terms, the test version is for people aged 18 and over.</li>
     </ul>
-    <p>The rest of this policy describes Plaeta from launch, when accounts and plans open.</p>
+    <p>The rest of this policy describes Plaeta from launch, when accounts open.</p>
 
     <h2 id="collect">What we collect</h2>
     <ul>
       <li><strong>Your account:</strong> email address, a password (stored only as a secure hash by our sign-in provider), date of birth, and an optional display name. We keep your date of birth to check your age.</li>
       <li><strong>What you add:</strong> your subjects, exam dates, syllabus files and topic lists, past papers you upload, your answers (typed or photographed), marks, feedback, flashcards and notes.</li>
-      <li><strong>Your plan:</strong> which plan you are on and its billing dates. Card details go straight to our payment provider, Stripe. We never see or store your card number.</li>
-      <li><strong>Usage:</strong> how many papers you uploaded this month and how much AI each request used, so we can apply your plan's limits.</li>
+      <li><strong>Usage:</strong> how many papers you uploaded this month and how much AI each request used, so we can apply the monthly limits.</li>
       <li><strong>Safety records:</strong> reports you send us, and a short log when our safety filter acts (what kind of thing it found and what it did, not the text you typed).</li>
     </ul>
     <p>We do not collect your school, home address or phone number, and we ask you not to type them anywhere in the app.</p>
 
     <h2 id="where">Where it is kept</h2>
-    <p>Your account and study data are stored with Supabase in its Australian region (Sydney), protected by database rules so each student can read only their own records. Uploaded files are kept in private storage that only your account can open. Payments are handled by Stripe. The app and this website are served by Cloudflare.</p>
+    <p>Your account and study data are stored with Supabase in its Australian region (Sydney), protected by database rules so each student can read only their own records. Uploaded files are kept in private storage that only your account can open. The app and this website are served by Cloudflare.</p>
 
     <h2 id="keep">How long we keep it</h2>
     <ul>
       <li><strong>Past papers you upload:</strong> the file, its page images and the question text are deleted automatically <span data-cfg="paperDays">60</span> days after upload. What stays is your own work: your answers, marks, feedback, flashcards and, for each question, a short label, its marks and its topic.</li>
       <li><strong>Your syllabus and topic list:</strong> kept while you use Plaeta, and deleted when you delete them or close your account.</li>
-      <li><strong>Everything else:</strong> kept while your account is open. If you pause your plan, your data is kept. If you close your account, we delete your data within 30 days, except records the law requires us to keep, such as payment records.</li>
+      <li><strong>Everything else:</strong> kept while your account is open. If you close your account, we delete your data within 30 days, except records the law requires us to keep.</li>
     </ul>
 
     <h2 id="share">Who sees it</h2>
     <p>Only you. Nothing you upload is shown to, shared with, or used to answer another student. We do not sell your information, show advertising, or use your work to train AI models. Our team looks at your data only to fix a problem you reported, or when the law requires it.</p>
-    <p>We use these service providers to run Plaeta, each only for its job: Supabase (accounts and storage), Stripe (payments), Cloudflare (hosting) and Anthropic (AI marking from launch).</p>
+    <p>We use these service providers to run Plaeta, each only for its job: Supabase (accounts and storage), Cloudflare (hosting) and Anthropic (AI marking from launch).</p>
 
     <h2 id="ai">How AI is used</h2>
     <p>Plaeta uses an AI system to read your papers, mark your answers, suggest flashcards and help plan your study. <strong>You are working with an AI system, not a person.</strong> Every mark, piece of feedback or suggestion made by AI is labelled in the app. AI can be wrong, so check its marks against your course's marking criteria and ask your teacher when unsure.</p>
@@ -120,8 +118,6 @@
     <ul>
       <li><strong>See and download your data:</strong> Settings, Your data, Export my data.</li>
       <li><strong>Correct it:</strong> edit your details in Settings, or contact us.</li>
-      <li><strong>Pause:</strong> pause your plan for up to 2 months and keep your data.</li>
-      <li><strong>Cancel:</strong> one step in Settings. We offer you an export first.</li>
       <li><strong>Delete:</strong> close your account and we delete your data as described above.</li>
       <li><strong>Complain:</strong> contact us first. If you are not happy with our answer, you can complain to the Office of the Australian Information Commissioner at <a href="https://www.oaic.gov.au" rel="noopener">oaic.gov.au</a>.</li>
     </ul>
@@ -142,8 +138,8 @@
   <div class="wrap">
     <div class="cols">
       <div><a class="brand" href="index.html" aria-label="Plaeta home"><img class="mark" src="favicon.svg" alt="" style="width:26px;height:26px"><img class="wm" src="wordmark.svg" alt="Plaeta" style="height:19px"></a><p class="tag">A study partner for high school. Made in Australia.</p></div>
-      <div><h4>Product</h4><a href="index.html#how">How it works</a><a href="index.html#subjects">Subjects</a><a href="index.html#pricing">Pricing</a><a href="#" data-app>Open the app</a></div>
-      <div><h4>Legal</h4><a href="privacy.html">Privacy policy</a><a href="terms.html">Terms of use</a><a href="terms.html#billing">Billing and refunds</a></div>
+      <div><h4>Product</h4><a href="index.html#how">How it works</a><a href="index.html#subjects">Subjects</a><a href="#" data-app>Open the app</a></div>
+      <div><h4>Legal</h4><a href="privacy.html">Privacy policy</a><a href="terms.html">Terms of use</a><a href="terms.html#cost">Cost and fair use</a></div>
       <div><h4>Contact</h4><a href="mailto:hello@example.com" data-cfg="contactEmail">hello@example.com</a><a href="privacy.html#report">Report a problem</a></div>
     </div>
     <div class="base"><span>&copy; <span id="year">2026</span> <span data-cfg="businessName">Plaeta</span></span><span>If you are in danger, call 000. Kids Helpline 1800 55 1800.</span></div>

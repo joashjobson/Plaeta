@@ -187,24 +187,6 @@ section{position:relative}
 @media (max-width:520px){.promise{grid-template-columns:1fr}}
 
 /* pricing */
-.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;align-items:stretch}
-@media (max-width:900px){.plans{grid-template-columns:1fr;max-width:460px;margin:0 auto}}
-.plan{position:relative;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:30px 28px;transition:transform .3s ease, box-shadow .3s ease}
-.plan:hover{transform:translateY(-4px);box-shadow:0 22px 50px rgba(20,22,31,.09)}
-.plan.rec{border-color:var(--brand);box-shadow:0 0 0 1px var(--brand), 0 22px 50px rgba(10,53,160,.12)}
-.plan .flag{position:absolute;top:-12px;left:28px;font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;background:var(--brand);color:#fff;padding:5px 10px;border-radius:6px}
-.plan h3{font-size:22px;margin-bottom:6px}
-.plan .blurb{color:var(--ink-3);font-size:15px;min-height:48px}
-.plan .price{display:flex;align-items:baseline;gap:6px;margin:22px 0 4px}
-.plan .price .amt{font-family:var(--serif);font-size:64px;line-height:1;letter-spacing:-.02em}
-.plan .price .per{color:var(--ink-3);font-size:15px}
-.plan .papers{font-family:var(--mono);font-size:13.5px;color:var(--brand-ink);background:var(--brand-soft);align-self:flex-start;padding:6px 10px;border-radius:8px;margin:10px 0 22px}
-.plan ul{list-style:none;padding:0;margin:0 0 28px;display:grid;gap:10px;font-size:15px;color:var(--ink-2);flex:1}
-.plan li{display:flex;gap:10px}
-.plan li::before{content:"";flex:none;width:14px;height:12px;margin-top:6px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 6' shape-rendering='crispEdges' fill='%236E9A5E'%3E%3Crect x='6' y='0' width='1' height='2'/%3E%3Crect x='5' y='1' width='1' height='2'/%3E%3Crect x='4' y='2' width='1' height='2'/%3E%3Crect x='3' y='3' width='1' height='2'/%3E%3Crect x='2' y='4' width='1' height='2'/%3E%3Crect x='1' y='3' width='1' height='2'/%3E%3Crect x='0' y='2' width='1' height='2'/%3E%3C/svg%3E") center/14px 12px no-repeat;image-rendering:pixelated}
-.plan .btn{justify-content:center}
-.plan:not(.rec) .btn{background:var(--surface);color:var(--ink);border-color:var(--line-2);box-shadow:none}
-.plan:not(.rec) .btn:hover{background:var(--bg)}
 .fine{margin-top:26px;text-align:center;font-size:14px;color:var(--ink-3)}
 
 /* faq */
@@ -273,17 +255,6 @@ footer .base{display:flex;flex-wrap:wrap;gap:10px 24px;justify-content:space-bet
 .start .grid{display:grid;grid-template-columns:1.1fr .9fr;gap:56px;align-items:start}
 @media (max-width:900px){.start .grid{grid-template-columns:1fr}}
 .start h1{font-size:clamp(44px,6vw,72px);margin-bottom:18px}
-.picker{display:grid;gap:12px;margin:30px 0}
-.pick{display:flex;align-items:center;gap:16px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px 18px;cursor:pointer;transition:border-color .2s, box-shadow .2s, transform .2s}
-.pick:hover{transform:translateY(-2px)}
-.pick input{appearance:none;width:20px;height:20px;border:1.5px solid var(--line-2);border-radius:50%;margin:0;flex:none;display:grid;place-items:center}
-.pick input:checked{border-color:var(--brand)}
-.pick input:checked::after{content:"";width:10px;height:10px;border-radius:50%;background:var(--brand)}
-.pick:has(input:checked){border-color:var(--brand);box-shadow:0 0 0 1px var(--brand)}
-.pick .nm{font-weight:600}
-.pick .sub{font-size:14px;color:var(--ink-3)}
-.pick .pr{margin-left:auto;font-family:var(--serif);font-size:30px;line-height:1}
-.pick .pr small{font-family:var(--sans);font-size:13px;color:var(--ink-3)}
 .next{background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:30px;box-shadow:var(--shadow)}
 .next h3{margin-bottom:18px}
 .next ol{list-style:none;counter-reset:n;padding:0;margin:0 0 26px;display:grid;gap:16px}
@@ -473,13 +444,6 @@ textarea.dm-in{resize:vertical}
   .dm-qrow{grid-template-columns:auto 1fr;gap:4px 12px}.dm-qm{grid-column:2}
 }
 
-/* the solar system on each plan: a bigger plan shows more worlds */
-.sys{position:relative;height:130px;margin:0 -6px 20px;border-radius:16px;background:radial-gradient(60% 85% at 50% 50%, var(--sky-1), transparent 78%);overflow:hidden}
-.sys.neb{background:radial-gradient(40% 70% at 30% 40%, rgba(192,74,140,.15), transparent 72%),radial-gradient(45% 75% at 72% 62%, rgba(122,92,196,.17), transparent 72%),radial-gradient(60% 85% at 50% 50%, var(--sky-1), transparent 78%)}
-.sys svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
-.sys .ring{fill:none;stroke:#C9C3B6;stroke-width:1;stroke-dasharray:2 4}
-.sys .sun{position:absolute;left:50%;top:50%;width:24px;height:24px;margin:-12px 0 0 -12px;border-radius:50%;background:#F6CF5A;box-shadow:0 0 0 5px rgba(246,207,90,.25),0 0 26px 8px rgba(246,207,90,.42)}
-.sys .sprite{position:absolute;transform:translate(-50%,-50%)}
 
 @media (prefers-reduced-motion: reduce){
   html{scroll-behavior:auto}
